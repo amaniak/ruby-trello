@@ -7,11 +7,11 @@ module Trello
   class BasicData
     include ActiveModel::Validations
     include ActiveModel::Dirty
-    include ActiveModel::Serializers::JSON
+    # include ActiveModel::Serializers::JSON
 
     class << self
       def path_name
-        name.split("::").last.underscore
+        name.split('::').last.underscore
       end
 
       def find(id, params = {})
@@ -45,7 +45,7 @@ module Trello
 
     def self.register_attributes(*names)
       options = { readonly: [] }
-      options.merge!(names.pop) if names.last.kind_of? Hash
+      options.merge!(names.pop) if names.last.is_a? Hash
 
       # Defines the attribute getter and setters.
       class_eval do
@@ -56,11 +56,10 @@ module Trello
         names.each do |key|
           define_method(:"#{key}") { @attributes[key] }
 
-          unless options[:readonly].include?(key.to_sym)
-            define_method :"#{key}=" do |val|
-              send(:"#{key}_will_change!") unless val == @attributes[key]
-              @attributes[key] = val
-            end
+          next if options[:readonly].include?(key.to_sym)
+          define_method :"#{key}=" do |val|
+            send(:"#{key}_will_change!") unless val == @attributes[key]
+            @attributes[key] = val
           end
         end
 
@@ -70,16 +69,16 @@ module Trello
 
     def self.one(name, opts = {})
       class_eval do
-        define_method(:"#{name}") do |*args|
+        define_method(:"#{name}") do |*_args|
           options = opts.dup
           klass   = options.delete(:via) || Trello.const_get(name.to_s.camelize)
           ident   = options.delete(:using) || :id
           path    = options.delete(:path)
 
           if path
-            client.find(path, self.send(ident))
+            client.find(path, send(ident))
           else
-            klass.find(self.send(ident))
+            klass.find(send(ident))
           end
         end
       end
@@ -89,7 +88,7 @@ module Trello
       class_eval do
         define_method(:"#{name}") do |*args|
           options   = opts.dup
-          resource  = options.delete(:in)  || self.class.to_s.split("::").last.downcase.pluralize
+          resource  = options.delete(:in) || self.class.to_s.split('::').last.downcase.pluralize
           klass     = options.delete(:via) || Trello.const_get(name.to_s.singularize.camelize)
           params    = options.merge(args[0] || {})
           resources = client.find_many(klass, "/#{resource}/#{id}/#{name}", params)
@@ -102,7 +101,7 @@ module Trello
       Trello.client
     end
 
-    register_attributes :id, readonly: [ :id ]
+    register_attributes :id, readonly: [:id]
 
     attr_writer :client
 
@@ -110,8 +109,8 @@ module Trello
       update_fields(fields)
     end
 
-    def update_fields(fields)
-      raise NotImplementedError, "#{self.class} does not implement update_fields."
+    def update_fields(_fields)
+      fail NotImplementedError, "#{self.class} does not implement update_fields."
     end
 
     # Refresh the contents of our object.
